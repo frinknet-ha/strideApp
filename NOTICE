@@ -9,6 +9,13 @@ License at:
 
 See LICENSE for the full text.
 
+Compatibility fork modifications (2026): C1750 startup/interlock compatibility,
+miles display, isolated YouTube media UI and persistent media controls,
+Bluetooth headphone discovery/pairing, and local trainer scripts/playback.
+The original upstream history and attribution are retained. These changes are
+independently maintained and are not an upstream-endorsed release.
+Generated speech recordings from the private installation are not distributed.
+
 
 ================================================================================
 Third-party components

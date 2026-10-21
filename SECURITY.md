@@ -1,5 +1,11 @@
 # Security
 
+## Compatibility fork scope
+
+This fork adds remote media in a separate WebView that has no motor-control bridge. The trusted local interface retains the Stride bridge; the media view only receives UI/playback callbacks. Public builds compile empty broker defaults. Local speech uses bundled assets, with no online synthesis during workouts and no audio-focus requests. They do not register the upstream remote coach-audio subscription. Headphone pairing uses Android's public APIs and leaves confirmation/audio routing to Android.
+
+Report ordinary fork-specific bugs to [this fork's issue tracker](https://github.com/frinknet-ha/strideApp/issues). For a sensitive issue, request a private reporting route without posting exploit details or credentials; no dedicated private reporting channel or response SLA is configured for this hobby fork. The upstream security-reporting route below is for issues in upstream STRIDE, not a promise that its maintainer supports these additions. The remaining upstream notes are historical context; consult the fork README for current behavior and limitations.
+
 STRIDE drives a motorised treadmill. On this project, a security problem and a
 safety problem are often the same problem — anything that lets someone or
 something move the belt when the person standing on it did not ask for it.

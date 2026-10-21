@@ -1,4 +1,8 @@
-# STRIDE v0.8.0
+# Compatibility fork 0.9.1 — source publication
+
+Adds the C1750 compatibility changes, miles display corrections, isolated YouTube media, persistent media controls, headphone discovery/pairing and three local coaching personalities. See the root README for hardware evidence, build instructions and remaining attended tests. Source publication excludes the private APK, credentials, signing identity and speech recordings. Public builds have blank broker defaults, an opt-in Home alias and text-only coaching unless a licensed audio pack is supplied.
+
+## Historical upstream v0.8.0 notes
 
 Zwift can see your treadmill now.
 

@@ -15,6 +15,9 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.view.MotionEvent
+import android.graphics.Rect
+import android.widget.FrameLayout
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import org.json.JSONArray
@@ -405,14 +408,19 @@ class MainActivity : Activity() {
             FitPro.Field.SLEEP_TIMER_STATE,
         )
 
-        /** KPH/GRADE are the board's *targets* — read so physical buttons don't desync us. */
-        val READS = listOf(FitPro.Field.KPH, FitPro.Field.GRADE) + TELEMETRY
+        /** KPH/GRADE are targets. KEY_OBJECT is captured raw to identify hardware key presses. */
+        val READS = listOf(FitPro.Field.KPH, FitPro.Field.GRADE, FitPro.Field.KEY_OBJECT) + TELEMETRY
 
         /** Candidate sources for a real belt speed — see probeSpeed(). */
         val SPEED_PROBE = listOf(FitPro.Field.RPM, FitPro.Field.ACTUAL_KPH)
     }
 
     private lateinit var web: WebView
+    private lateinit var media: MediaPanel
+    private lateinit var mediaControls: android.widget.LinearLayout
+    private lateinit var mediaPause: android.widget.Button
+    private var mediaOpen = false
+    private var mediaStopDialog: android.app.AlertDialog? = null
 
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
@@ -427,7 +435,11 @@ class MainActivity : Activity() {
      *  friends. Telemetry only, and silent on a radio that cannot advertise. */
     private val ftms by lazy { Ftms(this) }
     private val voice by lazy { CoachVoice(this) }
+    private val localTrainer by lazy { LocalVoiceTrainer(this, cfg) { line, kind ->
+        showCoach(JSONObject().put("line", line).put("kind", kind).toString())
+    } }
     private val coach = Coach()
+    private val headphones by lazy { Headphones(this) { Session.isMoving(session) } }
 
     @Volatile private var running = false
     @Volatile private var deviceId: Byte = FitPro.Dev.TREADMILL
@@ -435,6 +447,10 @@ class MainActivity : Activity() {
     @Volatile private var targetGrade = 0.0
     @Volatile private var fanState = 0
     @Volatile private var pendingWrite: Map<FitPro.Field, Double>? = null
+    /** Board's idle-start interlock, read at connect and changed only around a walk. */
+    @Volatile private var idleModeLockout: Boolean? = null
+    /** Last raw keypad payload, logged only on change during the supervised mapping investigation. */
+    private var lastKeyObjectHex: String? = null
 
     /** True while the board is refusing traffic pending VerifySecurity. The
      *  HUD shows this rather than sitting silently unable to act. */
@@ -469,6 +485,20 @@ class MainActivity : Activity() {
 
     /** Snap to a step grid, killing float drift like 6.500000000000001. */
     private fun quantise(v: Double, step: Double) = Math.round(v / step) * step
+
+    /** Keep the undocumented physical keypad payload opaque and read-only. */
+    private fun logKeyObjectChange(reply: ByteArray) {
+        val ordered = READS.sortedBy { it.id }
+        val field = FitPro.Field.KEY_OBJECT
+        val offset = 4 + ordered.takeWhile { it != field }.sumOf { it.size }
+        if (reply.size < offset + field.size + 1) return
+        val payload = reply.copyOfRange(offset, offset + field.size)
+        val hex = FitPro.hex(payload)
+        if (hex == lastKeyObjectHex) return
+        lastKeyObjectHex = hex
+        val boardKph = FitPro.Field.KPH.decode(reply, 4)
+        Log.i(TAG, "physical key payload changed: $hex; board target=${"%.2f".format(boardKph)} km/h")
+    }
 
     /**
      * Average pace for the session, km/h, from distance over time.
@@ -813,6 +843,37 @@ class MainActivity : Activity() {
 
     /** Exposed to the page as `Stride`. Every call lands on a WebView thread. */
     inner class Bridge {
+        @JavascriptInterface fun headphonesStatus(): String = headphones.status()
+        @JavascriptInterface fun voiceAudioReady(): Boolean =
+            (assets.list("coach")?.count { it.endsWith(".wav") } ?: 0) >= 108
+        @JavascriptInterface fun findHeadphones() = runOnUiThread { headphones.scan() }
+        @JavascriptInterface fun enableHeadphones() = runOnUiThread { headphones.enable() }
+        @JavascriptInterface fun pairHeadphones(address: String) = runOnUiThread { headphones.pair(address) }
+        @JavascriptInterface fun openHeadphones() {
+            runOnUiThread {
+                if (Session.isMoving(session)) {
+                    android.widget.Toast.makeText(this@MainActivity, "Pause the workout before pairing headphones", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    media.hide()
+                    try {
+                        startActivity(Intent().setClassName("com.android.settings", "com.android.settings.Settings\$BluetoothSettingsActivity"))
+                    } catch (_: Exception) {
+                        try { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                        catch (_: android.content.ActivityNotFoundException) {
+                            android.widget.Toast.makeText(this@MainActivity, "Bluetooth settings are unavailable", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        }
+        @JavascriptInterface fun showMedia() {
+            if (chosenUi() == "original") runOnUiThread { media.show() }
+        }
+        @JavascriptInterface fun closeMedia() = runOnUiThread { media.hide() }
+        @JavascriptInterface fun restoreMedia() = runOnUiThread { media.activity() }
+        @JavascriptInterface fun mediaBounds(left: Double, top: Double, width: Double, height: Double) {
+            runOnUiThread { media.bounds(left, top, width, height, web.width, web.height) }
+        }
 
         /**
          * Welcome screen → straight into a warm-up, the way iFit did it:
@@ -838,7 +899,7 @@ class MainActivity : Activity() {
             targetKph = 0.0
             rampTo = cfg.warmupKph()
             rampReason = "warmup"
-            pendingWrite = mapOf(FitPro.Field.WORKOUT_MODE to FitPro.Mode.RUNNING.toDouble())
+            pendingWrite = workoutStartWrite()
             Log.i(TAG, "workout chosen — warming up to ${cfg.warmupKph()} km/h")
             repaint()
         }
@@ -885,10 +946,7 @@ class MainActivity : Activity() {
             targetGrade = 0.0
             rampTo = cfg.warmupKph()
             rampReason = "warmup"
-            pendingWrite = mapOf(
-                FitPro.Field.GRADE to 0.0,
-                FitPro.Field.WORKOUT_MODE to FitPro.Mode.RUNNING.toDouble(),
-            )
+            pendingWrite = workoutStartWrite(mapOf(FitPro.Field.GRADE to 0.0))
             Log.i(TAG, "guided walk: ${template.name}, " +
                     (if (planLoops) "open (${cfg.openLapMin()} min circuit)" else "$minutes min") +
                     ", ${planSteps.size} segments, grade clamped to $minGrade..$maxGrade")
@@ -956,10 +1014,7 @@ class MainActivity : Activity() {
             targetGrade = 0.0
             rampTo = cfg.warmupKph()
             rampReason = "warmup"
-            pendingWrite = mapOf(
-                FitPro.Field.GRADE to 0.0,
-                FitPro.Field.WORKOUT_MODE to FitPro.Mode.RUNNING.toDouble(),
-            )
+            pendingWrite = workoutStartWrite(mapOf(FitPro.Field.GRADE to 0.0))
             Log.i(TAG, "route: ${r.name}, ${"%.2f".format(r.distanceM / 1000)} km, " +
                     "${"%.0f".format(r.climbM)} m climb, ${r.segments.size} segments" +
                     if (loop) " (looped)" else "")
@@ -1050,7 +1105,7 @@ class MainActivity : Activity() {
             }
             rampTo = if (pausedKph > 0.0) pausedKph else cfg.warmupKph()
             rampReason = "resuming"
-            pendingWrite = mapOf(FitPro.Field.WORKOUT_MODE to FitPro.Mode.RUNNING.toDouble())
+            pendingWrite = workoutStartWrite()
             Log.i(TAG, "resuming — ramping back to ${"%.1f".format(rampTo)} km/h")
             repaint()
         }
@@ -1089,10 +1144,7 @@ class MainActivity : Activity() {
             // setting that persists otherwise, and starting the next walk on
             // yesterday's hill is a nasty surprise.
             targetGrade = 0.0
-            pendingWrite = mapOf(
-                FitPro.Field.GRADE to 0.0,
-                FitPro.Field.WORKOUT_MODE to FitPro.Mode.RUNNING.toDouble(),
-            )
+            pendingWrite = workoutStartWrite(mapOf(FitPro.Field.GRADE to 0.0))
             Log.i(TAG, "cooling down for ${cfg.cooldownMs() / 1000}s")
             repaint()
         }
@@ -1219,6 +1271,7 @@ class MainActivity : Activity() {
          * words while the audio played on would be the worst of both.
          */
         @JavascriptInterface fun hushCoach() {
+            localTrainer.stop()
             voice.stop()
             coach.hush()
         }
@@ -1479,7 +1532,7 @@ class MainActivity : Activity() {
         mqtt.reconfigure(cfg.brokerUri(), cfg.mqttUser(), cfg.mqttPass(), cfg.mqttPrefix())
         // Re-registered because reconfigure() dropped the client, and a clean
         // session forgets subscriptions with it.
-        mqtt.onMessage(mqtt.coachTopic, ::onCoachLine)
+        // This fork uses local voice training; remote audio cannot bypass Coach Off.
         mqtt.onMessage(mqtt.uiTopic, ::onUiCommand)
         mqtt.onMessage(mqtt.personsTopic, ::onPersons)
         mqtt.onMessage(mqtt.routesTopic, routes::accept)
@@ -1537,6 +1590,7 @@ class MainActivity : Activity() {
      */
     private fun applySetting(key: String) {
         when (key) {
+            Settings.VOICE_TRAINER, Settings.VOICE_INTERVAL, Settings.VOICE_EXPLICIT -> localTrainer.settingsChanged()
             Settings.HA_ENABLED, Settings.MQTT_HOST, Settings.MQTT_PORT,
             Settings.MQTT_USER, Settings.MQTT_PASS, Settings.MQTT_TLS,
             Settings.MQTT_PREFIX -> Thread { applyMqttSettings() }.start()
@@ -1586,6 +1640,7 @@ class MainActivity : Activity() {
         code: Int, permissions: Array<out String>, results: IntArray
     ) {
         super.onRequestPermissionsResult(code, permissions, results)
+        if (code == Headphones.PERMISSION) { headphones.permissionResult(results); return }
         if (code != SCAN_PERMISSION) return
         val granted = results.firstOrNull() ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -1629,7 +1684,7 @@ class MainActivity : Activity() {
         prefs.edit().putString(PREF_UI, name).apply()
         Log.i(TAG, "ui: switching to $name")
         mqtt.publishUi(name)
-        runOnUiThread { web.loadUrl(assetFor(name)) }
+        runOnUiThread { media.hide(); web.loadUrl(assetFor(name)) }
     }
 
     /**
@@ -2245,13 +2300,66 @@ class MainActivity : Activity() {
                once rather than at poll rate — so it has to go over again or the
                new document draws a guided walk with no ground ahead of it. */
             webViewClient = object : android.webkit.WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean =
+                    !request.url.toString().startsWith("file:///android_asset/ui/")
+                override fun shouldInterceptRequest(view: WebView, request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
+                    // The motor bridge must never be exposed to remote documents, including iframes.
+                    if (request.url.scheme in listOf("http", "https"))
+                        return android.webkit.WebResourceResponse("text/plain", "UTF-8", java.io.ByteArrayInputStream(ByteArray(0)))
+                    return null
+                }
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (planSteps.isNotEmpty()) pushPlan()
                 }
             }
             loadUrl(assetFor(ui))
         }
-        setContentView(web)
+        val host = FrameLayout(this)
+        host.addView(web, FrameLayout.LayoutParams(-1, -1))
+        media = MediaPanel(this) { open, expanded ->
+            mediaOpen = open
+            if (this::mediaControls.isInitialized) updateMediaControls()
+            web.evaluateJavascript("window.strideMediaState && window.strideMediaState($open,$expanded)", null)
+        }
+        host.addView(media.view, FrameLayout.LayoutParams(1, 1))
+        mediaControls = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(22, 8, 22, 12)
+            setBackgroundColor(0xff071226.toInt())
+            visibility = View.GONE
+        }
+        val controls = Bridge()
+        fun mediaButton(label: String, action: () -> Unit): android.widget.Button {
+            val button = android.widget.Button(this).apply {
+                text = label; textSize = 17f; isAllCaps = false
+                setTextColor(if (label == "STOP") 0xffff5c7a.toInt() else android.graphics.Color.WHITE)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(0xff142344.toInt())
+                setOnClickListener { action() }
+            }
+            mediaControls.addView(button, android.widget.LinearLayout.LayoutParams(0, -1, 1f))
+            return button
+        }
+        mediaPause = mediaButton("Pause") { if (session == Session.PAUSED) controls.resume() else controls.pause() }
+        mediaButton("Speed −") { controls.speed(-0.1) }
+        mediaButton("Speed +") { controls.speed(0.1) }
+        mediaButton("Incline −") { controls.incline(-0.5) }
+        mediaButton("Incline +") { controls.incline(0.5) }
+        mediaButton("Fan") { controls.fan() }
+        mediaButton("STOP") {
+            controls.pause() // Pause first; confirmation never delays the stop request.
+            if (mediaStopDialog?.isShowing != true) {
+                mediaStopDialog = android.app.AlertDialog.Builder(this)
+                    .setTitle("Workout paused")
+                    .setMessage("End this workout or resume?")
+                    .setPositiveButton("End workout") { _, _ -> controls.end() }
+                    .setNegativeButton("Resume") { _, _ -> controls.resume() }
+                    .create().apply { setCanceledOnTouchOutside(false); show() }
+            }
+        }
+        host.addView(mediaControls, FrameLayout.LayoutParams(-1, (110 * resources.displayMetrics.density).toInt(), android.view.Gravity.BOTTOM))
+        setContentView(host)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -2446,7 +2554,7 @@ class MainActivity : Activity() {
         unlockWithRetries()
         readLimits()
         readSleepConfig()
-        mqtt.onMessage(mqtt.coachTopic, ::onCoachLine)
+        // This fork uses local voice training; remote audio cannot bypass Coach Off.
         mqtt.onMessage(mqtt.uiTopic, ::onUiCommand)
         mqtt.onMessage(mqtt.personsTopic, ::onPersons)
         mqtt.onMessage(mqtt.routesTopic, routes::accept)
@@ -2476,7 +2584,13 @@ class MainActivity : Activity() {
              * speed is still queued rather than lost with it. */
             var queued = pendingWrite
             var rest: Map<FitPro.Field, Double>? = null
-            if (queued != null && queued.size > 1 &&
+            if (queued != null && queued[FitPro.Field.IDLE_MODE_LOCKOUT] == 0.0 &&
+                queued.size > 1) {
+                // Release the idle interlock in its own frame before attempting
+                // the RUNNING transition it gates.
+                rest = queued.filterKeys { it != FitPro.Field.IDLE_MODE_LOCKOUT }
+                queued = mapOf(FitPro.Field.IDLE_MODE_LOCKOUT to 0.0)
+            } else if (queued != null && queued.size > 1 &&
                 queued.containsKey(FitPro.Field.WORKOUT_MODE)) {
                 rest = queued.filterKeys { it != FitPro.Field.WORKOUT_MODE }
                 queued = mapOf(FitPro.Field.WORKOUT_MODE to
@@ -2486,6 +2600,7 @@ class MainActivity : Activity() {
             val writes = enforceStopped(beltStillKph())
                 ?: enforceLevel(lastActualGrade)
                 ?: enforceFanOff()
+                ?: enforceIdleModeLockout()
                 ?: queued ?: decelStep() ?: rampStep()
 
             if (writes != null) lastWriteMs = SystemClock.elapsedRealtime()
@@ -2556,9 +2671,30 @@ class MainActivity : Activity() {
                     if (writeTries > WRITE_TRIES) {
                         Log.w(TAG, "giving up on a write the board keeps refusing ($why): " +
                                    queued.keys.joinToString { it.name })
-                        // A refused mode change must not take the rest of the
-                        // command down with it. The speed still wants sending.
-                        pendingWrite = rest
+                        if (queued[FitPro.Field.IDLE_MODE_LOCKOUT] == 0.0) {
+                            // Do not let a workout ramp continue if this board
+                            // will not release its idle interlock.
+                            idleModeLockout = true
+                            pendingWrite = null
+                            session = Session.WELCOME
+                            workout = "none"
+                            phaseEndsAt = 0L
+                            targetKph = 0.0
+                            rampTo = 0.0
+                            rampReason = ""
+                            resetSession()
+                            Log.e(TAG, "workout start cancelled: board refused to release idle lockout")
+                        } else if (queued[FitPro.Field.IDLE_MODE_LOCKOUT] == 1.0) {
+                            // Do not claim the idle interlock was restored if
+                            // the board rejected the write; stop nagging and
+                            // keep the UI available for a fresh connection.
+                            idleModeLockout = null
+                            pendingWrite = null
+                        } else {
+                            // A refused mode change must not take the rest of
+                            // the command down with it. The speed still wants sending.
+                            pendingWrite = rest
+                        }
                         writeTries = 0
                     }
                 }
@@ -2573,6 +2709,7 @@ class MainActivity : Activity() {
                 Thread.sleep(POLL_MS)
                 continue
             }
+            logKeyObjectChange(reply)
             boardLocked = false
             writeTries = 0
 
@@ -2587,7 +2724,10 @@ class MainActivity : Activity() {
             // the command rather than clearing the queue — the speed that was
             // asked for alongside it still has to be sent, on the very next
             // poll, now that the board is in a state that will accept it.
-            if (queued != null && writes === queued) pendingWrite = rest
+            if (queued != null && writes === queued) {
+                queued[FitPro.Field.IDLE_MODE_LOCKOUT]?.let { idleModeLockout = it != 0.0 }
+                pendingWrite = rest
+            }
 
             val v = FitPro.parse(reply, READS).filter { (f, value) ->
                 // Reject anything outside what the machine says it can do.
@@ -2631,8 +2771,7 @@ class MainActivity : Activity() {
             // then put the screen the person just left back for a fifth of a
             // second. One path, one answer to "which screen is this".
             repaint()
-            coachTick(snap)
-            speakSummary()
+            localTrainer.observe(snap, sessionStartedUptime)
 
             sinceFan += POLL_MS
             if (sinceFan >= FAN_EVERY_MS) { sinceFan = 0; readFan() }
@@ -3130,7 +3269,11 @@ class MainActivity : Activity() {
     /** Hand a state snapshot to the page. */
     private fun push(s: Snapshot) {
         val json = s.toJson()
-        runOnUiThread { web.evaluateJavascript("window.render($json)", null) }
+        runOnUiThread {
+            media.workoutState(s.session, s.dmk)
+            updateMediaControls()
+            web.evaluateJavascript("window.render($json)", null)
+        }
     }
 
     /**
@@ -3419,12 +3562,9 @@ class MainActivity : Activity() {
     /**
      * What the board's own idle timer is set to, read once and logged.
      *
-     * Nothing reads these back: they are here because the machine going to
-     * sleep is a decision the hardware makes on its own, and this is the only
-     * account of that decision we can get. All three are writable on the board
-     * and none of them is written — waking is a mode change, and changing how
-     * long the machine stays awake is a different question that nobody has
-     * asked.
+     * The lockout is read to preserve the board's normal idle behavior, then
+     * released only for an explicitly started workout and restored after it
+     * has stopped. Idle timeout and sleep timer remain observational only.
      *
      * One exchange each, the way [readFan] is. The board rejects a whole frame
      * over a single field it does not support, and one missing value should
@@ -3437,8 +3577,31 @@ class MainActivity : Activity() {
             if (reply == null) { Log.i(TAG, "sleep: no answer for ${f.name}"); continue }
             val why = FitPro.rejectReason(reply, one)
             if (why != null) { Log.i(TAG, "sleep: board will not report ${f.name} ($why)"); continue }
-            Log.i(TAG, "sleep: ${f.name} = ${FitPro.parse(reply, one)[f]}")
+            val value = FitPro.parse(reply, one)[f] ?: continue
+            if (f == FitPro.Field.IDLE_MODE_LOCKOUT) idleModeLockout = value != 0.0
+            Log.i(TAG, "sleep: ${f.name} = $value")
         }
+    }
+
+    /** Queue the interlock release before entering RUNNING; each state change
+     *  must land in its own frame because the board rejects invalid transitions. */
+    private fun workoutStartWrite(extra: Map<FitPro.Field, Double> = emptyMap()) = buildMap {
+        // Always clear it at the start transition: the board can restore the
+        // interlock itself when leaving a paused/running mode.
+        put(FitPro.Field.IDLE_MODE_LOCKOUT, 0.0)
+        putAll(extra)
+        put(FitPro.Field.WORKOUT_MODE, FitPro.Mode.RUNNING.toDouble())
+    }
+
+    /** Restore the console's idle interlock only after the board is paused and
+     *  the belt is confirmed stopped. A paused walk stays unlocked for Resume. */
+    private fun enforceIdleModeLockout(): Map<FitPro.Field, Double>? {
+        if (idleModeLockout != false || stopping) return null
+        if (session != Session.WELCOME && session != Session.SUMMARY) return null
+        if (lastBoardMode != FitPro.Mode.IDLE && lastBoardMode != FitPro.Mode.PAUSE) return null
+        if (beltStillKph() >= STOPPED_KPH) return null
+        if (pendingWrite == null) pendingWrite = mapOf(FitPro.Field.IDLE_MODE_LOCKOUT to 1.0)
+        return null
     }
 
     private fun readLimits() {
@@ -3454,12 +3617,38 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        mediaStopDialog?.dismiss()
+        if (this::media.isInitialized) media.close()
         running = false
         ftms.stop()
         voice.close()
+        localTrainer.close()
+        headphones.close()
         mqtt.close()
         conn.close()
         try { unregisterReceiver(permissionReceiver) } catch (_: IllegalArgumentException) {}
         super.onDestroy()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (this::media.isInitialized && event.actionMasked == MotionEvent.ACTION_DOWN) {
+            val area = Rect()
+            if (!media.view.getGlobalVisibleRect(area) || !area.contains(event.rawX.toInt(), event.rawY.toInt())) media.activity()
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    @Deprecated("Android 9 console uses the legacy back callback")
+    override fun onBackPressed() {
+        if (this::media.isInitialized && media.view.visibility == View.VISIBLE) media.hide()
+        else super.onBackPressed()
+    }
+
+    private fun updateMediaControls() {
+        if (!this::mediaControls.isInitialized) return
+        mediaControls.visibility = if (mediaOpen && session in listOf(Session.WARMUP, Session.ACTIVE, Session.PAUSED, Session.COOLDOWN) && !dmk) View.VISIBLE else View.GONE
+        mediaPause.text = if (session == Session.PAUSED) "Resume" else "Pause"
+        mediaControls.getChildAt(1).isEnabled = Session.isMoving(session) && !dmk
+        mediaControls.getChildAt(2).isEnabled = Session.isMoving(session) && !dmk
     }
 }

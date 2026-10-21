@@ -61,7 +61,7 @@
     '  border-right:1px solid #1e3068;padding:26px 0 0;display:flex;flex-direction:column}',
     '.sx-title{padding:0 30px 22px;font-size:34px;font-weight:200;letter-spacing:.02em}',
     '.sx-navs{flex:1;overflow:hidden}',
-    '.sx-nav{display:flex;align-items:center;width:100%;height:66px;padding:0 30px;',
+    '.sx-nav{display:flex;align-items:center;width:100%;height:60px;padding:0 30px;',
     '  background:none;border:none;color:#7f92c4;font-size:19px;font-weight:300;',
     '  text-align:left;border-left:3px solid transparent}',
     '.sx-nav .sx-ic{width:26px;height:26px;flex:none;opacity:.75;margin-right:16px}',
@@ -263,11 +263,12 @@
     return s;
   }
 
-  function stepper(key, value, min, max, inc, unit, dp) {
+  function stepper(key, value, min, max, inc, unit, dp, displayValue) {
     var s = el('div', 'sx-step');
     var v = el('div', 'sx-v');
     var draw = function () {
-      v.innerHTML = value.toFixed(dp || 0) + '<small>' + unit + '</small>';
+      v.innerHTML = (displayValue ? displayValue(value) : value.toFixed(dp || 0)) +
+        '<small>' + unit + '</small>';
     };
     var bump = function (d) {
       value = Math.min(max, Math.max(min, value + d * inc));
@@ -489,6 +490,7 @@
 
   /* ---- sections ---------------------------------------------------------- */
   var ICONS = {
+    headphones: 'M4 14v-3a8 8 0 0116 0v3M4 13H2v7h5v-7H4zm16 0h2v7h-5v-7h3z',
     people: 'M12 12a5 5 0 100-10 5 5 0 000 10zm-9 9a9 9 0 0118 0',
     hr: 'M12 21s-8-5.4-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.6-8 11-8 11z',
     ha: 'M3 11l9-8 9 8M5 10v10h14V10',
@@ -501,6 +503,7 @@
   };
 
   var SECTIONS = [
+    ['headphones', 'Headphones', paneHeadphones],
     ['people', 'Who walks',      paneWho],
     ['hr',     'Heart rate',     paneHeart],
     ['ha',     'Home Assistant', paneHa],
@@ -511,6 +514,51 @@
     ['screen', 'Display',        paneScreen],
     ['about',  'About',          paneAbout]
   ];
+
+  function paneHeadphones(pane) {
+    var sc = head(pane, 'Bluetooth headphones', 'Find and pair your headphones here. Pause the workout before pairing.');
+    var state = el('div', 'sx-sub');state.setAttribute('role', 'status');sc.appendChild(state);
+    var actions = el('div');actions.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;margin:24px 0';
+    var find = press(el('button', 'sx-pill sx-go', 'FIND HEADPHONES'), function () {
+      if (has('findHeadphones')) bridge().findHeadphones();
+    });
+    var enable = press(el('button', 'sx-pill', 'TURN BLUETOOTH ON'), function () {
+      if (has('enableHeadphones')) bridge().enableHeadphones();
+    });
+    actions.appendChild(find);actions.appendChild(enable);sc.appendChild(actions);
+    var list = el('div');sc.appendChild(list);
+    var note = el('div', 'sx-sub', 'Put new headphones in pairing mode. Android may show a pairing confirmation. A paired headset normally reconnects when switched on; if audio stays disconnected, use the Android connection settings below.');
+    note.style.marginTop = '24px';sc.appendChild(note);
+    var fallback = press(el('button', 'sx-pill', 'ANDROID CONNECTION SETTINGS'), function () {
+      if (has('openHeadphones')) bridge().openHeadphones();
+    });
+    fallback.style.marginTop = '20px';sc.appendChild(fallback);
+    var lastDevices = '';
+    function draw() {
+      var status = {};
+      try { status = JSON.parse(bridge().headphonesStatus()); } catch (e) { status.message = 'Headphone discovery is unavailable. Use Android connection settings.'; }
+      state.textContent = status.message || 'Loading Bluetooth…';
+      find.disabled = !!status.scanning || status.available === false || !status.enabled;
+      find.textContent = status.scanning ? 'SEARCHING…' : 'FIND HEADPHONES';
+      enable.style.display = status.enabled ? 'none' : '';
+      var devices = status.devices || [], signature = JSON.stringify(devices);
+      if (lastDevices === signature) return;lastDevices = signature;list.innerHTML = '';
+      if (!devices.length) { list.appendChild(el('div', 'sx-empty', 'No headphones found yet. Keep them close to the console and in pairing mode.')); return; }
+      devices.forEach(function (device) {
+        var item = el('div', 'sx-dev'), name = el('div', 'sx-dn');
+        var title = el('div', 'sx-n');title.textContent = device.name || 'Headphones';name.appendChild(title);
+        var description = el('div', 'sx-sub');description.style.fontSize = '15px';
+        description.textContent = device.connected ? 'Connected for audio' : device.pairing ? 'Pairing…' : device.paired ? 'Paired · audio disconnected' : 'Available to pair';
+        name.appendChild(description);item.appendChild(name);
+        var button = press(el('button', 'sx-pill', device.connected ? 'CONNECTED' : device.pairing ? 'PAIRING…' : device.paired ? 'CONNECT IN ANDROID' : 'PAIR'), function () {
+          if (device.paired) { if (has('openHeadphones')) bridge().openHeadphones(); }
+          else if (has('pairHeadphones')) bridge().pairHeadphones(device.address);
+        });
+        button.disabled = !!device.connected || !!device.pairing;item.appendChild(button);list.appendChild(item);
+      });
+    }
+    draw();pane.sxTick = draw;
+  }
 
   function head(pane, title, sub) {
     pane.appendChild(el('div', 'sx-h', title));
@@ -847,8 +895,11 @@
       stepper('warmup_min', S.warmup_min || 0, 0, 10, 1, 'min')));
     g2.appendChild(row('Cool-down', '',
       stepper('cooldown_min', S.cooldown_min || 0, 0, 10, 1, 'min')));
+    var miles = S.units === 'mi';
     g2.appendChild(row('Warm-up speed', 'Also the speed a cool-down eases back to.',
-      stepper('warmup_kph', S.warmup_kph || 2, 1, 6, 0.5, 'km/h', 1)));
+      stepper('warmup_kph', S.warmup_kph || 2, 1, 6, 0.5,
+        miles ? 'mph' : 'km/h', 1,
+        miles ? function (v) { return (v / 1.609344).toFixed(1); } : null)));
     sc.appendChild(g2);
 
     var g3 = group('Guided walks');
@@ -868,36 +919,76 @@
     g4.appendChild(row('Incline range', 'Read from the machine. Plans are clamped to this.',
       el('div', 'sx-ro', '<b>' + lim.minGrade.toFixed(1) + '</b> to <b>+' +
         lim.maxGrade.toFixed(1) + '</b> %')));
+    var showSpeed = function (v) { return miles ? v / 1.609344 : v; };
     g4.appendChild(row('Speed range', '',
-      el('div', 'sx-ro', '<b>' + lim.minKph.toFixed(1) + '</b> to <b>' +
-        lim.maxKph.toFixed(1) + '</b> km/h')));
+      el('div', 'sx-ro', '<b>' + showSpeed(lim.minKph).toFixed(1) + '</b> to <b>' +
+        showSpeed(lim.maxKph).toFixed(1) + '</b> ' + (miles ? 'mph' : 'km/h'))));
     sc.appendChild(g4);
   }
 
   // --- coach ---
+  // Local voice trainer settings.
   function paneCoach(pane) {
-    var sc = head(pane, 'Coach',
-      'Marks your kilometres and says something occasionally. It never touches the ' +
-      'belt — every pace change is yours.');
-
-    var g = group('');
-    g.appendChild(row('Coach', 'Off means a silent walk with no ribbon at all.',
-      toggle('coach_on', S.coach_on !== false)));
-    g.appendChild(row('How much it talks',
-      'Sparing marks kilometres and little else. Chatty adds pace and rhythm observations.',
-      segment('coach_talk', [['sparing', 'Sparing'], ['normal', 'Normal'], ['chatty', 'Chatty']],
-        S.coach_talk || 'normal')));
-    g.appendChild(row('Voice', 'Only affects wording, never what it is willing to say.',
-      segment('coach_voice', [
-        ['Supportive Friend', 'Supportive'], ['Drill Sergeant', 'Drill sergeant'],
-        ['Data Nerd', 'Data nerd'], ['Zen Master', 'Zen']
-      ], S.coach_voice || 'Supportive Friend')));
-    g.appendChild(row('Written by Home Assistant',
-      'Off keeps every line on the console — the built-in ones, which are shorter and never late.',
-      toggle('coach_remote', S.coach_remote !== false)));
-    g.appendChild(row('Announce milestones', 'First mark at 500 m, then every kilometre.',
-      toggle('coach_milestones', S.coach_milestones !== false)));
-    sc.appendChild(g);
+    var sc = head(pane, 'Voice trainer', 'Your coach, at your pace. Spoken guidance plays over your video.');
+    if (has('voiceAudioReady') && !bridge().voiceAudioReady()) {
+      sc.appendChild(el('div', 'sx-sub', 'Audio pack not installed. Coaching is text-only in this build.'));
+    }
+    var coach = S.voice_trainer || 'off';
+    var options = [
+      ['off', 'Off', 'A quiet workout.'],
+      ['supportive', 'Supportive Coach', 'Positive encouragement. A friend in your corner.'],
+      ['pace', 'Pace Coach', 'Permission to slow down and find your own pace.'],
+      ['drill', 'Drill Sergeant', 'Blunt motivation. Explicit language and personal roasting.']
+    ];
+    var cards = el('div');
+    cards.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px';
+    cards.setAttribute('role', 'group');cards.setAttribute('aria-label', 'Choose your coach');
+    var explicitRow = el('label');
+    explicitRow.style.cssText = 'display:none;align-items:center;gap:12px;padding:14px 0;color:#ffd3ad;font-size:16px';
+    var consent = document.createElement('input');consent.type = 'checkbox';
+    consent.style.cssText = 'width:24px;height:24px;accent-color:#39e0ff';
+    consent.checked = !!S.voice_explicit;
+    consent.addEventListener('change', function () { save('voice_explicit', consent.checked); draw(); });
+    explicitRow.appendChild(consent);
+    explicitRow.appendChild(el('span', '', 'Allow explicit language and personal roasting'));
+    var summary = el('div');
+    summary.style.cssText = 'padding:18px 20px;margin-top:16px;border:1px solid #1e3068;border-radius:16px;color:#9caed6;font-size:16px;line-height:1.6';
+    var frequency = segment('voice_interval', [['180', '3 min'], ['300', '5 min'], ['600', '10 min']],
+      String(S.voice_interval || 300), function () { draw(); });
+    frequency.setAttribute('aria-label', 'Tips and motivation frequency');
+    function draw() {
+      [].forEach.call(cards.children, function (button) {
+        var on = button.getAttribute('data-coach') === coach;
+        button.style.borderColor = on ? '#39e0ff' : '#1e3068';
+        button.style.background = on ? 'rgba(57,224,255,.14)' : 'rgba(22,37,90,.4)';
+        button.setAttribute('aria-pressed', String(on));
+      });
+      explicitRow.style.display = coach === 'drill' ? 'flex' : 'none';
+      var off = coach === 'off';
+      [].forEach.call(frequency.children, function (button) { button.disabled = off; });
+      frequency.style.opacity = off ? '.4' : '1';
+      summary.textContent = off ? 'Voice trainer is off. Choose a coach to hear spoken guidance during your workout.' :
+        coach === 'drill' && !consent.checked ? 'Drill Sergeant is silent until you allow explicit language.' :
+        'Tips and motivation every ' + Number(S.voice_interval || 300) / 60 + ' minutes. Workout start, completed miles, upcoming hills, recovery and finish are announced when they happen.';
+    }
+    options.forEach(function (option) {
+      var button = el('button');button.type = 'button';button.setAttribute('data-coach', option[0]);
+      button.style.cssText = 'min-height:106px;padding:18px 20px;border:2px solid #1e3068;border-radius:18px;text-align:left;color:#eaf0ff;cursor:pointer';
+      button.appendChild(el('div', '', option[1]));
+      button.firstChild.style.cssText = 'font-size:22px;font-weight:300;margin-bottom:7px';
+      var detail = el('div', '', option[2]);detail.style.cssText = 'font-size:15px;line-height:1.4;color:#9caed6';button.appendChild(detail);
+      press(button, function () {
+        coach = option[0];save('voice_trainer', coach);
+        // Changing coaches clears the explicit-language acknowledgement.
+        consent.checked = false;save('voice_explicit', false);draw();
+      });
+      cards.appendChild(button);
+    });
+    sc.appendChild(cards);
+    sc.appendChild(explicitRow);
+    sc.appendChild(row('Tips & motivation', 'How often your coach checks in.', frequency));
+    sc.appendChild(summary);
+    draw();
   }
 
   // --- interface ---
@@ -941,8 +1032,7 @@
        this reaches the serial link. */
     var gu = group('Units');
     gu.appendChild(row('Distance and speed',
-      'Everything on every screen, and everything published. The board stays ' +
-      'metric underneath.',
+      'Workout screens and summaries. The treadmill connection stays metric underneath.',
       segment('units', [['km', 'Kilometres'], ['mi', 'Miles']], S.units || 'km')));
     sc.appendChild(gu);
 

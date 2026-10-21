@@ -1,0 +1,228 @@
+{
+  "version": "0.9.1",
+  "events": [
+    {
+      "id": "start",
+      "label": "Workout start",
+      "detail": "Ease into your opening pace."
+    },
+    {
+      "id": "hill",
+      "label": "Hill approaching",
+      "detail": "A guided-workout incline change is approaching."
+    },
+    {
+      "id": "steady",
+      "label": "Steady effort",
+      "detail": "You have settled into a consistent rhythm."
+    },
+    {
+      "id": "push",
+      "label": "Motivation",
+      "detail": "An optional motivational check-in."
+    },
+    {
+      "id": "mile",
+      "label": "Mile completed",
+      "detail": "Celebrate a distance milestone."
+    },
+    {
+      "id": "recovery",
+      "label": "Recovery",
+      "detail": "Take the planned easier interval."
+    },
+    {
+      "id": "finish",
+      "label": "Workout finished",
+      "detail": "Close out the session."
+    }
+  ],
+  "personalities": [
+    {
+      "id": "supportive",
+      "name": "Supportive Coach",
+      "tagline": "A friend in your corner.",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "rate": "+0%",
+      "explicit": false,
+      "lines": {
+        "start": [
+          "You showed up. That's a good start. Settle into a pace that feels right for you.",
+          "One step at a time. Find your rhythm. I'm right here with you.",
+          "Give yourself a gentle opening few minutes. You can build the effort once you feel settled.",
+          "Today's goal is to find an effort you can sustain. Start easy and let your rhythm come to you."
+        ],
+        "hill": [
+          "There's a hill coming up. Shorten your stride, stay tall, and choose a pace you can control.",
+          "An incline is coming. You don't have to rush it. Take the hill one steady step at a time.",
+          "An uphill section is next. Keep your steps comfortable and let your speed match the extra effort.",
+          "We have a climb ahead. Relax your hands, look forward, and take it one step at a time."
+        ],
+        "steady": [
+          "That's a lovely rhythm. Relax your shoulders and keep breathing.",
+          "You're being consistent. That effort adds up, even when it feels ordinary.",
+          "Let your hands relax. You can keep working without carrying tension in your fists.",
+          "Check your posture. Look ahead and let your shoulders settle comfortably.",
+          "Find a comfortable breathing rhythm. If the effort feels too much, ease the pace.",
+          "Keep your steps smooth. You don't need to reach far out in front of you.",
+          "Check in with yourself. A little adjustment now can help the next few minutes feel better.",
+          "Consistency is built in moments like this. Stay with an effort that works for you."
+        ],
+        "push": [
+          "You've got more in you if you're feeling good. Choose your next effort. You're in charge.",
+          "You're doing the work. If you want a little more, build it gradually.",
+          "Think about why you made time for this today. Every comfortable step is part of that commitment.",
+          "You don't need a personal best today. Showing up and doing the work is progress.",
+          "Focus on this minute. You can decide what the next one needs when you get there.",
+          "Notice one thing that feels stronger or more comfortable than when you started.",
+          "You're building a habit with every session. This effort belongs to you.",
+          "If you're feeling strong, enjoy it. If today is harder, adjusting the pace is still moving forward."
+        ],
+        "mile": [
+          "Another mile done. Give yourself credit. You earned every step.",
+          "That's another mile in the bank. Look at what you've already done.",
+          "You've completed a mile. Check your breathing, take stock of your effort, and give yourself some credit.",
+          "Another mile completed. Stay with your own pace and enjoy that progress."
+        ],
+        "recovery": [
+          "Take this recovery. An easier pace is part of the workout, too.",
+          "Let your breathing settle. There's nothing to prove during recovery.",
+          "Recovery gives you a chance to let the effort settle before the next part. Keep this section easy.",
+          "An easy interval helps you manage the whole workout. Let your breathing come back under control."
+        ],
+        "finish": [
+          "Workout complete. You made time for yourself today. Well done.",
+          "You stayed with it. Enjoy the cool-down. That was your work, and it counts.",
+          "That's the end of the session. Take an easy cool-down before you step off.",
+          "Session finished. You gave yourself time to move today, and that matters."
+        ]
+      }
+    },
+    {
+      "id": "pace",
+      "name": "Pace Coach",
+      "tagline": "Permission to slow down. Progress at your pace.",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "rate": "+0%",
+      "explicit": false,
+      "lines": {
+        "start": [
+          "Begin gently. Let your steps find a comfortable rhythm.",
+          "Be here for this step. Then the next. There is no rush.",
+          "Start with a pace that feels easy. There is no need to decide the whole workout right now.",
+          "Give yourself time to warm up. A comfortable walk is a perfectly good place to begin."
+        ],
+        "hill": [
+          "A hill is coming. You can slow down or walk the climb. There is no need to hold the same speed uphill.",
+          "The incline is changing. Choose a comfortable effort. Taking it slower is a valid choice.",
+          "There's an uphill section ahead. You can ease your speed before the climb begins.",
+          "A climb is coming. Keep the effort comfortable, even if that means taking it much slower."
+        ],
+        "steady": [
+          "This pace is enough. You do not have to go faster for your effort to count.",
+          "Listen to how you feel. You can stay here, ease back, or take a break.",
+          "Unclench your hands and soften your shoulders. Let your steps feel unhurried.",
+          "Try looking ahead instead of down. Find a posture that feels comfortable.",
+          "Check your breathing. If you'd prefer a little more ease, slow the pace.",
+          "You can walk for the rest of this session. There is nothing you have to prove.",
+          "Pay attention to how your body feels today. The plan can adapt to you.",
+          "Let the next few minutes be simple. Comfortable steps and a manageable effort are enough."
+        ],
+        "push": [
+          "It is okay to slow down. Walking counts. Choose a pace that feels manageable today.",
+          "You do not have to earn a recovery break. Ease back when you need to. This is your workout.",
+          "Rest and easier days belong in a routine too. You can adjust your goal without losing your progress.",
+          "Your pace doesn't need to match anyone else's. Choose what feels right for this minute.",
+          "A shorter session can still be worthwhile. You get to decide when you've done enough.",
+          "You can be proud of making time for movement without chasing a faster number.",
+          "If the day has taken a lot out of you, give yourself an easier workout.",
+          "You don't have to finish the way you started. Slowing down is an option whenever you need it."
+        ],
+        "mile": [
+          "One more mile behind you. Take a breath and acknowledge it.",
+          "Another milestone. No hurry. Just progress.",
+          "A mile completed at your own pace. Take a moment to appreciate it.",
+          "Another mile is behind you. You can keep going gently, or begin winding down."
+        ],
+        "recovery": [
+          "Ease back. Recovery is part of the rhythm.",
+          "Let your breathing settle. Keep this interval comfortable.",
+          "This easier interval lets the effort settle. Recovery is part of training, not a failure to keep going.",
+          "Use this recovery to find comfortable breathing again. An easy pace helps you manage what comes next."
+        ],
+        "finish": [
+          "Your session is complete. Finish gently. You have done enough for today.",
+          "The work is finished. Take your time coming back to stillness.",
+          "Your workout has ended. Give yourself an easy cool-down and time to settle.",
+          "That's your session complete. However far you went, you made time for yourself."
+        ]
+      }
+    },
+    {
+      "id": "drill",
+      "name": "Drill Sergeant",
+      "tagline": "Blunt, loud-mouthed, and explicitly profane.",
+      "voice": "en-US-AndrewMultilingualNeural",
+      "rate": "+0%",
+      "explicit": true,
+      "lines": {
+        "start": [
+          "Alright, you lazy fuck. You showed up. Now put some purpose into those steps. Pick a pace you can handle.",
+          "Get your ass moving. This workout isn't going to do itself. Start controlled, then earn the effort.",
+          "Time to get your ass in gear. Warm up first. A smart start beats a stupid sprint.",
+          "You're here, so make it count. Start easy, find your rhythm, and bring some damn focus."
+        ],
+        "hill": [
+          "Hill coming up. Get your shit together, shoulders back, short steps. Take that climb at a pace you can own.",
+          "Here's the damn hill. Focus up. You don't need a miracle, you need the next solid step.",
+          "Climb ahead. Short steps, relaxed shoulders. Pick an effort you can handle and own the damn hill.",
+          "Here comes the uphill. Don't let your ego pick the speed. Stay controlled and get the job done."
+        ],
+        "steady": [
+          "There you go. That's some actual fucking consistency. Stay focused and own that rhythm.",
+          "Look at you putting in the work. Keep your shit together and stay smooth.",
+          "Unclench those damn fists. Put that energy into smooth steps instead.",
+          "Shoulders down, eyes forward. Get your posture together and keep this controlled.",
+          "Check your breathing. If you're overcooking it, back the hell off and find your rhythm.",
+          "Smooth steps. You're training, not trying to stomp a hole through the damn deck.",
+          "Pay attention to how you feel. Discipline includes adjusting the plan when you need to.",
+          "Stay with this minute. Consistency is boring as hell sometimes, and it still gets the work done."
+        ],
+        "push": [
+          "Come on, you lazy fuck, you can do better if you've got it today. Choose a controlled effort and commit.",
+          "Less bullshit, more purpose. Pick your next minute and make every damn step count.",
+          "You made time for this. Give the next minute some purpose, whatever pace you've chosen.",
+          "Stop arguing with the clock. One damn step, then the next. That's the job.",
+          "Nobody needs a heroic sprint. Give me an honest, controlled effort.",
+          "This is how habits get built. Show up, do the work, and repeat the damn thing.",
+          "If you've got more today, build gradually. If you haven't, quit the ego bullshit and hold a manageable pace.",
+          "Look at the work you've already put in. That didn't happen by sitting on your ass."
+        ],
+        "mile": [
+          "Another fucking mile. You earned that. Don't let anyone tell you that effort doesn't count.",
+          "Mile done. That's your work right there. Not luck, not excuses. Your damn work.",
+          "A full damn mile completed. Check your effort and take the win.",
+          "Another mile in the books. That's earned progress. Keep your next steps controlled."
+        ],
+        "recovery": [
+          "Take the fucking recovery. Training smart is part of the job. Breathe and reset.",
+          "Ease back. This is the recovery interval, not an ego contest. Do the damn plan.",
+          "Recovery lets the effort settle so you can manage the rest of the workout. Take the damn easy interval seriously.",
+          "Back off and get your breathing comfortable. Recovery is in the plan for a reason. Follow the fucking plan."
+        ],
+        "finish": [
+          "You finished the fucking workout. That's how it's done. Cool down and take the win.",
+          "Work done. No more excuses today. You showed up and delivered. Now cool down properly.",
+          "Session complete. You did the damn work. Now give yourself an easy cool-down.",
+          "That's the workout finished. Take the win, cool down, and come back ready for another day."
+        ]
+      }
+    }
+  ],
+  "audio": {
+    "provider": "Microsoft Edge neural speech via edge-tts",
+    "voice": "en-US-AndrewMultilingualNeural",
+    "format": "wav",
+    "note": "Same voice and delivery settings for all three personalities. Generated online; playback uses local files."
+  }
+}

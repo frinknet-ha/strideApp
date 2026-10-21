@@ -1,240 +1,86 @@
-# STRIDE
+# STRIDE Compat — C1750 media and trainer fork
 
-**Replace the iFit software on a NordicTrack treadmill. Keep the belt, lose the subscription.**
+Source fork of [keranm/strideApp](https://github.com/keranm/strideApp), preserving its Git history, Apache-2.0 license and attribution. This fork adds console media and local coaching work for a NordicTrack C1750. It is independently maintained and is not an upstream release or a NordicTrack/iFit product.
 
-**Please note**: This is a hobby project by one person and Claude Code, please don't get upset at that. Claude Code is enabling me to be able to do something I've dreamed of doing for a few years but didn't have the ability. Now I'm able to walk/run on my own physical hardware that I bought without it having someone else's subscription software on it. If you don't like that 90% of this was coded with AI tools like Claude Code - then this isn't the project for you. If you want to fork this, put your fingerprints all over it ... please do, I'd welcome that!
+**Fork version: 0.9.1-compat · Android version code 12.** Read [SAFETY.md](SAFETY.md) before connecting software to a treadmill. Starting a workout can move the belt; guided plans can move the incline.
 
-> ### 🚧 Early days and factory reset has saved me more than once
->
-> It works, and I walk on it most days, but it works on *my* machine. Nobody
-> else has installed it yet and I've no idea how it behaves on other hardware.
->
-> Nothing here is supported, so use it at your own risk. If it goes wrong a
-> factory reset puts the original software back, and I've done that plenty of
-> times while building this.
->
-> Read the code, take the [protocol notes](protocol/FITPRO_PROTOCOL.md), and
-> tell me what board your treadmill has.
+## Added in this fork
 
-> ⚠️ **This drives a motorised treadmill.** Read [SAFETY.md](SAFETY.md) before
-> you install anything. Your physical safety key is still the stop that matters
-> and it cuts the motor directly. STRIDE drives the incline, but speed is only
-> ever suggested. You decide when to go faster.
+- YouTube text search and embedded playback in a separate media WebView, with default treadmill scenery results and expansion after playback inactivity.
+- A native control strip above the video for pause/resume, speed, incline, fan and STOP/end-workout controls.
+- Bluetooth headphone discovery and pairing from Settings, with separate paired/connected audio status and Android connection settings as a fallback.
+- Three local trainers: Supportive Coach, Pace Coach and an explicitly profane Drill Sergeant. Settings offer Off or a coach, plus tips every 3, 5 or 10 minutes.
+- 108 coaching scripts. Timed tips alternate steady effort and motivation. Start, completed whole miles, upcoming planned hills, recovery and finish use workout events.
+- Corrected miles display across the interfaces, plus board-specific idle/start interlock compatibility changes and read-only physical-key diagnostics.
 
-> **Gen 7 / iFit 2.0.** Second-hand reports say this update closes the
-> privileged-mode route everything here depends on. If you know how to do this on Gen 7
-> let us know the steps and we can update this
+The original project includes the treadmill protocol implementation, guided workouts, multiple interfaces, Home Assistant/MQTT integration and Bluetooth FTMS telemetry. See the [upstream documentation](https://github.com/keranm/strideApp/blob/main/README.md) for its background. This fork uses local coaching instead of the upstream remote live-coach audio subscription.
 
+## Hardware and test status
 
-I got tired of iFit on my NordicTrack. Manual mode, a 400 m loop, and an
-interface that kept asking me to subscribe. The console turns out to be an
-Android tablet talking to a separate motor board, so I replaced what runs on
-the tablet and left the motor board alone.
+| Component | Observed installation |
+| --- | --- |
+| Treadmill | NordicTrack C1750, model NTL14122K1F |
+| Console | MalataMediatekArgon2, Android 9 |
+| WebView | 83.0.4103.120 |
+| App package | `dev.stride.hud.compat`, separate from upstream `dev.stride.hud` |
 
-The belt and the deck now work with no login, no subscription and no internet.
-If you want it, everything the machine knows turns up in Home Assistant as
-ordinary entities. I built it with Claude Code alongside me, and there's a
-[full write-up of how the jailbreak works](https://theidea.works/blog/jailbreak-nordictrack-treadmill/)
-if you'd rather read the story than the steps.
+The private 0.9.1 build was installed on this console. YouTube playback, default search, idle expansion, settings layout, Home-app selection, miles display and in-app Bluetooth discovery have been observed across the console updates. Native trainer policy checks cover timing, distance boundaries, lifecycle and guided-plan events.
 
-**[v0.8](https://github.com/keranm/strideApp/releases/latest)**, in daily use,
-and it now pairs with Zwift over Bluetooth FTMS.
+**Limits of that evidence:** headphone bonding completion/audio routing and trainer speech mixed with YouTube during a moving workout still need attended testing. The media control strip also needs a complete attended moving-workout check. Compatibility with other treadmill models or board revisions is not established. Board-specific interlock writes are not generic settings for arbitrary FitPro hardware.
 
-![STRIDE on a NordicTrack console](docs/screenshots/oval-original.png)
+There is **no PIN-enforced speed limit** or verified interception of physical speed keys in this fork. Read-only keypad diagnostics do not prevent a physical preset from accelerating the belt. Do not treat this app as a child-safety lock.
 
-**[More screenshots →](docs/GALLERY.md)**
+## Source-only publication and voice packs
 
----
+This repository does not distribute a signed APK, private signing keys, broker credentials, household configuration, diagnostic screenshots or the generated speech recordings used on the private console.
 
-## What's in here
+The public source builds without a speech pack. Coaching then uses the same scripts as **text-only** messages and Settings identifies the missing audio pack. Supply recordings or TTS output you have rights to use if you want spoken coaching. See [voice-pack instructions](docs/VOICE_PACK.md). All three personalities can share one voice; their wording supplies the personality. Drill Sergeant stays silent until its explicit-language acknowledgement is enabled.
 
-| | |
-|---|---|
-| **`console/`** | The Android app that replaces iFit on the treadmill's own screen. Talks to the motor board over USB, drives the incline, runs guided walks, and gives you five completely different interfaces to pick from. |
-| **`homeassistant/`** | Optional scripts for the coach, the reminders and a health dashboard. The treadmill shows up in Home Assistant without any of them. |
-| **`protocol/`** | The [FitPro serial protocol](protocol/FITPRO_PROTOCOL.md), decoded and written down. If you're working on a different machine, start here. |
+Speech uses an independent local MediaPlayer without requesting audio focus or controlling the YouTube player. That design is intended to allow overlapping playback; actual mixing depends on the Android/media implementation and still needs the attended test described above.
 
-There used to be an `ios/` folder. That's now its own thing,
-**[AH for HA](https://github.com/keranm/ah-for-ha)**, which pushes Apple Health
-into Home Assistant and has no treadmill in it at all. It grew to 39 metrics,
-rings, sleep stages and workouts, and most people who want that will never own
-a treadmill.
+## Build
 
-STRIDE kept the half it cares about. An outdoor walk can still become a
-gradient profile the deck replays, because that arrives over MQTT and the
-console has never cared who published it.
-
----
-
-## Home Assistant needs nothing installed
-
-Put your broker details into Settings → Home Assistant on the treadmill and a
-**Treadmill** device shows up, with speed, incline, distance, elapsed, pulse,
-calories, mode and workout, plus a device per person as they walk. The console
-publishes its own MQTT discovery, so there's no integration, no YAML and no
-custom component.
-
-Build whatever dashboard you like from it. There's no STRIDE dashboard you have
-to accept.
-
-The `homeassistant/` scripts are for the extras: the coach, the reminders, and
-an opinionated health dashboard if you want a starting point.
-
----
-
-## Will it work on my treadmill?
-
-Honestly, maybe. It's proven on one machine, mine:
-
-| | |
-|---|---|
-| Model | NordicTrack C 1750 |
-| Generation | Gen 6, the embedded "CLASSIC" console |
-| Motor board | FitPro, device id `0x04` |
-| Reported ranges | incline −3 to +12 %, speed 1.6 to 20 km/h |
-
-Other Gen 6 NordicTrack and ProForm consoles on the same board are probably
-fine, because the protocol looks like a family rather than a single model, but
-nobody has tried. You also need a console you can reach with `adb`, and that's
-the part that varies most by model and year.
-
-[`console/usbprobe`](console/usbprobe) asks your board what it is and changes
-nothing. It's an app you install on the console, so it needs ADB and the iFit
-software out of the way first, which makes it step 6 below rather than
-something you can run today.
-
-**Please open an issue with whatever it tells you,** working or not. A list of
-known-good boards would be the most useful thing this project could have and it
-doesn't exist yet. I'm not buying more treadmills to build one.
-
----
-
-## Installing
-
-**[docs/INSTALL.md](docs/INSTALL.md)** has the full step by step, but read the
-banner at the top of this page first. Nobody who didn't already know the
-answers has followed that guide yet, and it marks its own weak spots.
-
-In outline:
-
-1. **Factory reset the console.** Stay offline afterwards.
-2. **Enable privileged mode.** Tap ten times, wait seven seconds, tap ten more,
-   then answer the challenge code the console gives you.
-3. **Force stop iFit Admin** (`com.ifit.eru`) and take away its two
-   permissions, then force stop and uninstall iFit (`com.ifit.standalone`).
-4. **Enable ADB over Wi-Fi.** Tap Build number seven times, turn on USB
-   debugging, join your network.
-5. **Run [`tools/unchain.sh`](tools/unchain.sh).** Disables the iFit packages
-   and installs the launcher.
-6. **Identify your board** with [`console/usbprobe`](console/usbprobe), which
-   reads and changes nothing. Report what it says.
-7. **Install the console app**, then set it up on its own screen. Either grab
-   the signed APK from [the latest release](https://github.com/keranm/strideApp/releases/latest)
-   and `adb install -r` it, or build your own with `console/stride/run.sh`.
-   Pick one and stay on it — they're signed with different keys, so swapping
-   later means uninstalling and losing your settings.
-8. **Optional:** enter broker details on the console to get the treadmill into
-   Home Assistant, then add the coach.
-
-Stop after step 7 and you've got a treadmill with no subscription. Steps 1 to 7
-need nothing installed on the Home Assistant side.
-
-If you'd rather not drive it by hand, point Claude Code at this repo, give
-it the treadmill's IP address, and ask it to follow the install guide over ADB.
-That's how most of my own installs have gone.
-
----
-
-## Configuration
-
-**The console configures itself.** Broker details, who walks, units, warm-up,
-coach, heart rate, display: all of it lives in Settings on the treadmill's own
-screen. No config files, no rebuild.
-
-**The Home Assistant side reads one file:**
+Requirements: Java 17, Android SDK platform 34/build-tools 34, platform-tools and Python 3 for optional checks/tools. `minSdk` and `targetSdk` are 28 for this console. This is an ADB-installed hobby project, not a Play Store app.
 
 ```sh
-cp homeassistant/stride.conf.example homeassistant/stride.conf
+cd console/stride
+# Set ANDROID_HOME to your Android SDK directory, or set sdk.dir in local.properties.
+./gradlew assembleDebug
 ```
 
-Every key is documented in the example. Leave anything blank and that subject
-is simply absent, so no scale, no blood-pressure cuff, no phone. The coach says
-nothing about what it wasn't given rather than guessing at it.
+On Windows without a wrapper batch file:
 
-`coach_ai_task` has no default, because which AI entity you have depends on
-which integration you set up.
+```powershell
+cd console/stride
+java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain assembleDebug
+```
 
-**For weekly and monthly totals**, copy
-[`homeassistant/packages/stride.yaml`](homeassistant/packages/stride.yaml) into
-your Home Assistant config. The console's distance counter resets every walk,
-so the accumulating has to happen in HA. That file also creates the helpers the
-coach and reminders need.
+Debug output is `app/build/outputs/apk/debug/app-debug.apk`. Do not distribute a debug build as a production release. Release signing is optional for source compilation; `assembleRelease` produces an unsigned APK when no release identity is configured. Configure your own signing identity using the comments in `app/build.gradle.kts`. Never upload your keystore or `local.properties`.
 
----
+Broker defaults are always empty in public builds, even when local signing/SDK properties exist. Configure MQTT using Settings → Home Assistant on your own console.
 
-## How it's put together
+The Home alias is disabled by default in public builds. Selecting STRIDE as Home is a separate owner decision; the existing [unchain helper](tools/unchain.sh) documents how to enable/reverse it. An explicit build-time opt-in is `-PstrideHomeEnabled=true`.
 
-A few decisions that will save you reading the code to find them.
+## Checks
 
-- **Kotlin owns the treadmill, HTML owns the screen.** The five interfaces are
-  HTML in a WebView, so you can design them in a browser. Tap SPEED+ and the
-  belt speeds up, but the request goes through Kotlin first, which clamps it to
-  whatever the board says it can do. A bad layout can't outrun the machine.
-- **The coach decides when to speak, Home Assistant decides what it says.**
-  With HA unreachable it still marks your kilometres, using a set of lines
-  built into the console.
-- **Never hand over a number without its age.** Health metrics that reset at
-  midnight are withheld entirely if they haven't changed since midnight, rather
-  than being passed on as today's. This one came from a real incident: the
-  sensors hold yesterday's closing total and look exactly like today's running
-  total, so the coach quoted yesterday's numbers back at me as though they were
-  fresh.
-- **Coaching and recording are per person, not per console.** Guests get
-  neither. They're summarised at the end of a walk and then forgotten.
+```sh
+cd console/stride
+./gradlew assembleRelease
+python3 checks/check-voice-policy.py
+```
 
----
+The policy check compiles the actual Android-independent Kotlin policy using the Kotlin compiler already cached by Gradle. It requires Java 17 and a preceding Gradle build. It issues no treadmill commands. The public source build and these checks passed locally before publication. The inherited upstream tag-release workflow has no signing secrets configured for this fork; no binary release or tag is published here.
 
-## Fork it
+## Installation and rollback
 
-Please do. STRIDE is [Apache-2.0](LICENSE), so you can change it, ship it, sell
-it and build something else out of it without asking me. There's no CLA and you
-keep the copyright on whatever you write.
+Use the upstream installation/protocol documentation only after checking your exact hardware and understanding its recovery procedure. Keep a known-good original launcher and an appropriate recovery path available. Never remotely start the belt to test an installation.
 
-The thing I'd most like back is **what board your treadmill has**, working or
-not. That list is one machine long today and it can only grow from other
-people's treadmills. There's an
-[issue template](https://github.com/keranm/strideApp/issues/new/choose) for it.
+The compatibility package can coexist with upstream STRIDE. A different signing key cannot update an already installed package of the same name: keep your signing identity consistent and do not uninstall an existing app just to get past a signature error. The source-only public fork is not a drop-in signed update for the private console installation.
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers getting set up, where things live,
-how to redesign an interface in a browser without touching a treadmill, and the
-rules I'd ask you to keep if you're changing anything that moves the belt.
+To leave a Home-app setup, restore another launcher/default Home before removing STRIDE; see [tools/unchain.sh](tools/unchain.sh). For an in-place rollback, use a known-good APK signed with the same identity and account for Android version-code/downgrade restrictions. App data/profile compatibility must be checked separately. Avoid factory-resetting a console without its device-specific recovery instructions.
 
----
+## Contributions and attribution
 
-## Thanks
+Please include the exact model, console/Android version, board revision if known, and whether a report concerns stationary UI behavior or a supervised workout. Keep credentials, health/profile data and identifiable diagnostic captures out of public issues. See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-**[nordictrack-ftms-bridge](https://github.com/ciarancoffey/nordictrack-ftms-bridge)**
-by @[ciarancoffey](https://github.com/ciarancoffey). A couple of folks on reddit asked whether STRIDE could speak FTMS, which is the
-standard Bluetooth service Zwift and friends use to talk to a treadmill, and
-I took a look at Ciaran's project. This showed that YES an iFit Android console can be a Bluetooth LE *peripheral*, not just a
-central. Using that as inspiration I coded up a working FTMS implementation
-
-That project is AGPL-3.0 and STRIDE is Apache-2.0, so no code moves between
-them. FTMS is a published Bluetooth SIG specification, and anything built here
-gets built from the spec.
-
-The install guide's [own credit](docs/INSTALL.md#credit) covers the community
-Gen 6 modding guide that steps 1.1 to 1.4 follow.
-
----
-
-## Licence
-
-[Apache-2.0](LICENSE). No warranty, and see [SAFETY.md](SAFETY.md).
-
-STRIDE is an independent project, built for compatibility with hardware its
-authors own. Not affiliated with or endorsed by iFIT, ICON Health & Fitness,
-NordicTrack, ProForm, Apple or Home Assistant. Trademarks belong to their
-owners and are used here only to say what this works with.
-
-This repository contains no code from any of those companies.
+Upstream STRIDE is copyright 2026 The Idea Works. Fork modifications cover compatibility, units, isolated media UI, headphone setup and local coaching. Upstream has not reviewed or endorsed these additions. No vendor software is included.

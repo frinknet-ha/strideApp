@@ -1134,6 +1134,55 @@ function nf(n) {
  *  still for two minutes at a time, which reads as a frozen display. */
 function km(m, dp) { return ((m || 0) / 1000).toFixed(dp == null ? 2 : dp); }
 
+/* The board protocol and Kotlin model use km/h and metres. Convert only at
+   the presentation edge, according to the live Display preference. */
+var DISPLAY_MILES = false;
+function refreshDisplayUnits() {
+  try {
+    DISPLAY_MILES = !!(global.Stride && typeof global.Stride.settingsJson === 'function' &&
+      JSON.parse(global.Stride.settingsJson()).units === 'mi');
+  } catch (e) { DISPLAY_MILES = false; }
+  return DISPLAY_MILES;
+}
+function milesSelected() { return DISPLAY_MILES; }
+function displaySpeed(kph, dp) {
+  return ((kph || 0) * (milesSelected() ? 1 / 1.609344 : 1))
+    .toFixed(dp == null ? 1 : dp);
+}
+function displaySpeedUnit(upper) {
+  var unit = milesSelected() ? 'mph' : 'km/h';
+  return upper ? unit.toUpperCase() : unit;
+}
+function displayDistance(metres, dp) {
+  var divisor = milesSelected() ? 1609.344 : 1000;
+  return ((metres || 0) / divisor).toFixed(dp == null ? 2 : dp);
+}
+function displayDistanceUnit(upper) {
+  var unit = milesSelected() ? 'mi' : 'km';
+  return upper ? unit.toUpperCase() : unit;
+}
+function displayDistanceText(metres, dp) {
+  return displayDistance(metres, dp) + ' ' + displayDistanceUnit(false);
+}
+function displayDistanceLabel(metres) {
+  if (milesSelected()) return displayDistanceText(metres, 2);
+  metres = metres || 0;
+  return metres >= 1000 ? displayDistanceText(metres, 2) : Math.round(metres) + ' m';
+}
+function syncUnitLabels() {
+  refreshDisplayUnits();
+  var speed = displaySpeedUnit(false), speedUpper = displaySpeedUnit(true);
+  var distance = displayDistanceUnit(false), distanceUpper = displayDistanceUnit(true);
+  var els = document.querySelectorAll('[data-stride-unit]');
+  for (var i = 0; i < els.length; i++) {
+    var kind = els[i].getAttribute('data-stride-unit');
+    if (kind === 'speed') els[i].textContent = speed;
+    else if (kind === 'speed-upper') els[i].textContent = speedUpper;
+    else if (kind === 'distance') els[i].textContent = distance;
+    else if (kind === 'distance-upper') els[i].textContent = distanceUpper;
+  }
+}
+
 var FAN_NAMES = ['OFF', 'LOW', 'MEDIUM', 'HIGH', 'AUTO'];
 function fanName(n) { return FAN_NAMES[n] || 'OFF'; }
 /** The control row's own label: "OFF" or "2 OF 4". */
@@ -1570,6 +1619,14 @@ global.STRIDE = {
   mmss: mmss,
   nf: nf,
   km: km,
+  milesSelected: milesSelected,
+  speed: displaySpeed,
+  speedUnit: displaySpeedUnit,
+  distance: displayDistance,
+  distanceUnit: displayDistanceUnit,
+  distanceText: displayDistanceText,
+  distanceLabel: displayDistanceLabel,
+  syncUnitLabels: syncUnitLabels,
   durationLabel: durationLabel,
   fanName: fanName,
   fanLabel: fanLabel,

@@ -5,18 +5,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Broker credentials come from local.properties, which git ignores, rather than
-// from constants in the source. A fresh clone therefore builds an app that
-// cannot reach the broker until someone supplies them — which is the correct
-// failure, and much better than shipping a working password to anyone who
-// clones the repo.
+// Local properties are for SDK/release signing only. Public broker defaults
+// stay empty regardless of this file; configure MQTT through console Settings.
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-
-fun secret(key: String, fallback: String = "") =
-    "\"${localProps.getProperty(key, fallback)}\""
 
 android {
     namespace = "dev.stride.hud"
@@ -25,18 +19,22 @@ android {
     buildFeatures { buildConfig = true }
 
     defaultConfig {
-        applicationId = "dev.stride.hud"
+        // Separate package from upstream STRIDE; existing upstream data stays intact.
+        applicationId = "dev.stride.hud.compat"
         minSdk = 28
         targetSdk = 28
         // Bumped per release, because the About screen is the only place
         // anyone can see which build is on a console, and "0.1-spike · build 1"
         // was still being shown four months and one published repo later.
-        versionCode = 4
-        versionName = "0.8.0"
+        versionCode = 12
+        versionName = "0.9.1-compat"
 
-        buildConfigField("String", "MQTT_BROKER", secret("mqtt.broker", ""))
-        buildConfigField("String", "MQTT_USER", secret("mqtt.user"))
-        buildConfigField("String", "MQTT_PASS", secret("mqtt.pass"))
+        // Public builds never compile broker credentials, even from local.properties.
+        buildConfigField("String", "MQTT_BROKER", "\"\"")
+        buildConfigField("String", "MQTT_USER", "\"\"")
+        buildConfigField("String", "MQTT_PASS", "\"\"")
+        manifestPlaceholders["strideHomeEnabled"] =
+            (findProperty("strideHomeEnabled")?.toString()?.toBoolean() ?: false).toString()
     }
     /*
      * A release build is what belongs on a treadmill.
@@ -105,6 +103,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    androidResources { noCompress += "wav" }
 }
 
 dependencies {

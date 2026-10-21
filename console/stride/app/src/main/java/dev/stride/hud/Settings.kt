@@ -70,6 +70,9 @@ class Settings(context: Context) {
 
         // --- coach ---
         const val COACH_ON = "coach_on"
+        const val VOICE_TRAINER = "voice_trainer"
+        const val VOICE_INTERVAL = "voice_interval"
+        const val VOICE_EXPLICIT = "voice_explicit"
         const val COACH_TALK = "coach_talk"       // "sparing" | "normal" | "chatty"
         const val COACH_VOICE = "coach_voice"
         const val COACH_REMOTE = "coach_remote"
@@ -349,6 +352,10 @@ class Settings(context: Context) {
     // --- coach ----------------------------------------------------------------
 
     fun coachOn(): Boolean = prefs.getBoolean(COACH_ON, true)
+    fun voiceTrainer(): String = (prefs.getString(VOICE_TRAINER, "off") ?: "off")
+        .takeIf { it in listOf("off", "supportive", "pace", "drill") } ?: "off"
+    fun voiceInterval(): Int = prefs.getInt(VOICE_INTERVAL, 300).takeIf { it in listOf(180, 300, 600) } ?: 300
+    fun voiceExplicit(): Boolean = prefs.getBoolean(VOICE_EXPLICIT, false)
     fun coachRemote(): Boolean = prefs.getBoolean(COACH_REMOTE, true)
     fun coachMilestones(): Boolean = prefs.getBoolean(COACH_MILESTONES, true)
     fun coachVoice(): String = prefs.getString(COACH_VOICE, "Supportive Friend")
@@ -421,6 +428,9 @@ class Settings(context: Context) {
         .put(INCLINE_RATE, prefs.getString(INCLINE_RATE, "normal"))
         .put(OPEN_LAP_MIN, openLapMin())
         .put(COACH_ON, coachOn())
+        .put(VOICE_TRAINER, voiceTrainer())
+        .put(VOICE_INTERVAL, voiceInterval())
+        .put(VOICE_EXPLICIT, voiceExplicit())
         .put(COACH_TALK, prefs.getString(COACH_TALK, "normal"))
         .put(COACH_VOICE, coachVoice())
         .put(COACH_REMOTE, coachRemote())
@@ -443,7 +453,7 @@ class Settings(context: Context) {
         val e = prefs.edit()
         when (key) {
             ALLOW_GUEST, HA_ENABLED, MQTT_TLS, COACH_ON, COACH_REMOTE,
-            COACH_MILESTONES, CLOCK_24, KEEP_AWAKE ->
+            COACH_MILESTONES, CLOCK_24, KEEP_AWAKE, VOICE_EXPLICIT ->
                 e.putBoolean(key, value == "true" || value == "1")
 
             MQTT_PORT, WARMUP_MIN, COOLDOWN_MIN, OPEN_LAP_MIN, SLEEP_MIN ->
@@ -451,6 +461,9 @@ class Settings(context: Context) {
 
             WARMUP_KPH ->
                 e.putFloat(key, value.toFloatOrNull() ?: 2.0f)
+
+            VOICE_TRAINER -> e.putString(key, value.takeIf { it in listOf("off", "supportive", "pace", "drill") } ?: "off")
+            VOICE_INTERVAL -> e.putInt(key, value.toIntOrNull()?.takeIf { it in listOf(180, 300, 600) } ?: 300)
 
             else -> e.putString(key, value)
         }

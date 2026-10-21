@@ -1,0 +1,18 @@
+#nativeMediaLaunch{position:absolute;left:30px;bottom:28px;width:170px;height:54px;z-index:6;border-color:var(--accent);color:var(--accent);border-radius:16px;font-size:15px;display:none}
+#screenHud.on~#nativeMediaLaunch{bottom:auto;top:8px;left:210px;height:40px}
+#nativeMediaSpace,#nativeMediaValues,#nativeMediaIdleClose{display:none}
+body.native-media-open{position:relative;transform-origin:0 0}
+body.native-media-open #nativeMediaSpace{display:block;position:absolute;top:62px;left:24px;right:24px;height:484px}
+body.native-media-open #screenHud>.side,body.native-media-open #stage,body.native-media-open #path,body.native-media-open #phase,body.native-media-open #screenHud>.metrics,body.native-media-open #coach,body.native-media-open #screenWelcome>.welcome{visibility:hidden}
+body.native-media-open #nativeMediaValues{display:flex;position:absolute;top:550px;left:24px;right:24px;height:108px;align-items:center;justify-content:space-around;background:#101f40;border-radius:16px}
+#nativeMediaValues span{display:block;text-align:center;font-size:13px;letter-spacing:2px;color:#a4b5d5}
+#nativeMediaValues b{display:block;text-align:center;font-weight:400;font-size:29px;margin-top:7px}
+#nativeMediaRestore{display:none}
+body.native-media-expanded #nativeMediaSpace{top:0;left:0;right:0;height:604px}
+body.native-media-expanded .topbar{visibility:hidden}
+body.native-media-expanded #nativeMediaValues{top:604px;height:66px}
+body.native-media-expanded #nativeMediaValues b{font-size:24px;margin-top:3px}
+body.native-media-expanded #nativeMediaRestore{display:block;flex:none;height:44px;max-width:none;border-radius:12px;padding:0 18px;font-size:15px}
+body.native-media-open.native-media-idle #nativeMediaIdleClose{display:block;position:absolute;top:690px;left:420px;width:440px;max-width:none;height:64px;border-radius:18px}
+/* Media workouts use a separate native strip above every WebView. */
+body.native-media-open #screenHud>.controls{visibility:hidden}

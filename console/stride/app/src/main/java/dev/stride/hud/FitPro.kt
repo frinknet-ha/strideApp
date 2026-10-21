@@ -132,6 +132,8 @@ object FitPro {
         GRADE(1, 2, 0.01, true, true, "Target incline", "%"),
         RPM(5, 2, 1.0, false, false, "Belt RPM", ""),
         DISTANCE(6, 4, 1.0, false, false, "Distance", "m"),
+        // Opaque 14-byte physical keypad payload; decoded only as raw bytes for diagnostics.
+        KEY_OBJECT(7, 14, 1.0, false, false, "Physical key", ""),
         FAN_SPEED(8, 1, 1.0, false, true, "Fan", ""),
         // 4 bytes wide, but only byte 0 is bpm — see decode().
         PULSE(10, 4, 1.0, false, false, "Pulse", "bpm"),
@@ -153,7 +155,7 @@ object FitPro {
            for. Read once at startup and logged — see MainActivity's
            readSleepConfig. */
         IDLE_TIMEOUT(34, 2, 1.0, false, false, "Idle timeout", "s"),
-        IDLE_MODE_LOCKOUT(95, 1, 1.0, false, false, "Idle lockout", ""),
+        IDLE_MODE_LOCKOUT(95, 1, 1.0, false, true, "Idle lockout", ""),
         // FanState: 0 Off, 1 Low, 2 Medium, 3 High, 4 Auto
         FAN_STATE(98, 1, 1.0, false, true, "Fan", ""),
         SLEEP_TIMER_STATE(107, 1, 1.0, false, false, "Sleep timer", ""),
@@ -161,6 +163,7 @@ object FitPro {
 
         /** Decode this field's raw bytes into a scaled value. */
         fun decode(b: ByteArray, off: Int): Double {
+            if (this == KEY_OBJECT) return 0.0 // Preserve bytes separately; this is not a number.
             // Pulse is a packed struct, not a number:
             //   [0] userPulse (bpm)  [1] average  [2] count  [3] source
             // Reading all four as an integer yields garbage once a strap connects.
@@ -181,6 +184,7 @@ object FitPro {
          * is 4,294,967 km, and as a signed grade it reads a believable -0.01 %.
          */
         fun isSentinel(b: ByteArray, off: Int): Boolean {
+            if (this == KEY_OBJECT) return false // An all-FF payload can be a legitimate idle value.
             for (i in 0 until size) if ((b[off + i].toInt() and 0xFF) != 0xFF) return false
             return true
         }

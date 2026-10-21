@@ -40,7 +40,7 @@
          plain HTTP: the console's clock reads 2022, so TLS validation fails on
          anything served over HTTPS. The URL never leaves the LAN. -->
     <application
-        android:label="STRIDE"
+        android:label="STRIDE Compat"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="true"
@@ -63,7 +63,7 @@
                 android:resource="@xml/device_filter" />
         </activity>
 
-        <!-- Kiosk mode, off until asked for.
+        <!-- Optional Home role; public builds leave it disabled until requested.
 
              Enabling this alias makes STRIDE the console's home app, so it
              comes back not just after a reboot but after being dismissed or
@@ -77,7 +77,7 @@
         <activity-alias
             android:name=".HomeAlias"
             android:targetActivity=".MainActivity"
-            android:enabled="false"
+            android:enabled="${strideHomeEnabled}"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -2,7 +2,6 @@ package dev.stride.hud
 
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.AudioManager
 import android.media.MediaPlayer
 import android.util.Log
 
@@ -67,7 +66,8 @@ class CoachVoice(private val context: Context) {
             )
             mp.setDataSource(url)
             mp.setOnPreparedListener {
-                duck(true)
+                // Local media and trainer speech mix. Never request audio focus:
+                // some players pause even for transient MAY_DUCK requests.
                 it.start()
                 Log.i(TAG, "coach: speaking (${it.duration} ms)")
             }
@@ -99,25 +99,7 @@ class CoachVoice(private val context: Context) {
 
     private fun done() {
         speaking = false
-        duck(false)
         release()
-    }
-
-    /** Nothing else makes noise on this console today, but be a good citizen. */
-    @Suppress("DEPRECATION")
-    private fun duck(on: Boolean) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            if (on) {
-                am.requestAudioFocus(
-                    null, AudioManager.STREAM_MUSIC,
-                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-                )
-            } else {
-                am.abandonAudioFocus(null)
-            }
-        } catch (_: Exception) {
-        }
     }
 
     private fun release() {

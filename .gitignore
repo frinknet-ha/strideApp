@@ -32,3 +32,12 @@ docs/journal/
 archive/
 
 .DS_Store
+
+# Private speech packs and local distribution artifacts are build inputs, not source.
+console/stride/app/src/main/assets/coach/*.wav
+*.apk
+*.aab
+*.pem
+*.key
+*.credentials
+__pycache__/

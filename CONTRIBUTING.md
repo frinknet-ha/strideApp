@@ -1,5 +1,9 @@
 # Contributing
 
+## This compatibility fork
+
+Send fork-specific issues and pull requests to [frinknet-ha/strideApp](https://github.com/frinknet-ha/strideApp), and read its README for current build/audio-pack limitations. Include the exact treadmill/console model and distinguish stationary UI checks from attended moving-workout tests. Do not include credentials, profile/health data, private APKs or generated audio without appropriate redistribution rights. The original upstream contribution guidance below is historical context; upstream has not endorsed these changes.
+
 Fork it, change it, ship it. STRIDE is [Apache-2.0](LICENSE), so you can do all
 of that commercially and without asking me. There's no CLA and you keep the
 copyright on what you write.
@@ -30,7 +34,7 @@ where, or send a pull request that fixes it.
 You need the Android SDK and a console you can reach over ADB.
 
 ```sh
-git clone https://github.com/keranm/strideApp.git
+git clone https://github.com/frinknet-ha/strideApp.git
 cd strideApp/console/stride
 ./run.sh          # builds, installs, launches, tails the log
 ```
